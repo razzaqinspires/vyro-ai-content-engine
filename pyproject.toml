@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vyro-ai-content-engine"
-version = "1.2.0"
-description = "Structured, review-first AI content planning and script engineering for VYRO MEDIA."
+version = "1.3.0"
+description = "Review-first AI content planning, script engineering, storyboards, and optional image generation for VYRO MEDIA."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }

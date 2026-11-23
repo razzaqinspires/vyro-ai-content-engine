@@ -1,9 +1,20 @@
 from __future__ import annotations
 
 from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 Severity = Literal["info", "warning", "blocking"]
+
+
+class AssetReference(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    asset_id: str | None = Field(default=None, min_length=3, max_length=120)
+    path_or_url: str = Field(min_length=1, max_length=2048)
+    media_type: Literal["image", "video", "audio"]
+    rights_confirmed: bool = False
+    attribution: str | None = Field(default=None, max_length=500)
+    source: Literal["library", "user_upload", "licensed_stock", "generated"] = "user_upload"
 
 
 class ReviewFlag(BaseModel):
@@ -18,15 +29,18 @@ class Scene(BaseModel):
     scene_number: int = Field(ge=1, le=20)
     duration_seconds: float = Field(gt=0, le=45)
     visual_direction: str = Field(min_length=5, max_length=700)
+    visual_prompt: str = Field(default="", max_length=4000)
+    visual_style: str = Field(default="", max_length=500)
     on_screen_text: str = Field(min_length=1, max_length=140)
     voiceover: str = Field(default="", max_length=900)
     asset_hint: str | None = Field(default=None, max_length=300)
+    asset_rationale: str | None = Field(default=None, max_length=500)
     transition: str | None = Field(default=None, max_length=100)
 
 
 class ContentBrief(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
-    schema_version: str = "1.0"
+    schema_version: str = "1.2"
     content_id: str = Field(min_length=4, max_length=80, pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]+$")
     title: str = Field(min_length=5, max_length=140)
     pillar: str = Field(min_length=2, max_length=80)
@@ -42,8 +56,14 @@ class ContentBrief(BaseModel):
     hashtags: list[str] = Field(default_factory=list, max_length=8)
     source_urls: list[HttpUrl] = Field(default_factory=list, max_length=20)
     claims_to_verify: list[str] = Field(default_factory=list, max_length=20)
+    assets: list[AssetReference] = Field(default_factory=list, max_length=30)
+    reference_asset_ids: list[str] = Field(default_factory=list, max_length=30)
+    brand_voice: str = Field(default="jelas, natural, profesional, tidak clickbait", max_length=500)
+    visual_style: str = Field(default="VYRO MEDIA: black, white, neon lime, diagonal, cinematic", max_length=500)
+    template_id: str | None = Field(default=None, max_length=120)
     paid_partnership: bool = False
     ai_generated_media: bool = False
+    human_review_required: bool = True
     notes: str | None = Field(default=None, max_length=2000)
 
     @field_validator("content_id")
@@ -64,11 +84,17 @@ class ContentBrief(BaseModel):
                 cleaned.append(tag)
         return list(dict.fromkeys(cleaned))[:8]
 
+    @model_validator(mode="after")
+    def enforce_review_gate(self):
+        if not self.human_review_required:
+            raise ValueError("human_review_required must remain true")
+        return self
+
 
 class ContentPackage(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    schema_version: str = "1.1"
-    content_id: str
+    schema_version: str = "1.3"
+    content_id: str = Field(min_length=4, max_length=80)
     title: str
     pillar: str
     audience: str
@@ -84,6 +110,8 @@ class ContentPackage(BaseModel):
     call_to_action: str
     source_urls: list[HttpUrl] = Field(default_factory=list, max_length=20)
     claims_to_verify: list[str] = Field(default_factory=list, max_length=20)
+    assets: list[AssetReference] = Field(default_factory=list, max_length=30)
+    visual_style: str = Field(default="", max_length=500)
     review_flags: list[ReviewFlag] = Field(default_factory=list, max_length=30)
     human_review_required: bool = True
     review_approved: bool = False
@@ -98,4 +126,6 @@ class ContentPackage(BaseModel):
             raise ValueError("Total durasi scene melebihi toleransi 135%")
         if not self.human_review_required:
             raise ValueError("human_review_required harus selalu true")
+        if self.review_approved:
+            raise ValueError("AI tidak boleh menyetujui content package sendiri")
         return self

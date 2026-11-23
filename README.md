@@ -1,77 +1,44 @@
 # VYRO AI Content Engine
 
-**Version:** 1.1.0  
-**Role:** Transform a validated content brief into a review-ready, structured production package.  
-**Boundary:** This repository generates content strategy, scripts, hooks, scene plans, on-screen text, captions, and voiceover *text*. It does **not** synthesize audio, render video, schedule posts, or publish.
+**Release:** 1.3.0 · **Python:** 3.11+ · **Purpose:** transform validated briefs into production-ready content packages and optional image assets.
 
-## What changed in 1.1.0
+## Responsibilities
+- Generate hook variants, selected narration, scene plans, shot direction, captions, CTA, and restrained hashtags.
+- Produce scene-level `visual_prompt` strings for image generation or human production.
+- Preserve source URLs, claims to verify, and rights-aware asset references.
+- Optionally generate an image through the official OpenAI Images API when separately configured.
+- Keep all generated content in a mandatory human-review state; AI cannot approve its own output.
 
-- Clearly separated AI voice generation into the independent `vyro-ai-voice-studio` repository.
-- Strengthened brief and output contracts with bounded text, scene, and hashtag fields.
-- Added claim traceability, editorial review flags, brand-safety reminders, and a mandatory human-approval state.
-- Added provider retry/backoff, configurable timeouts, strict JSON parsing, and request IDs.
-- Added a stable integration contract: `ContentPackage` JSON with `content_id` unchanged end-to-end.
+Voice synthesis is deliberately excluded and belongs to `vyro-ai-voice-studio`. Video rendering belongs to `vyro-video-render-engine`. This service does not publish to Instagram.
 
-## Pipeline
+## API
+- `GET /health`
+- `POST /v1/content/generate`
+- `POST /v1/images/generate`
+- `GET /v1/images/files/{demo_id}/{asset_id}`
 
-1. Validate the incoming brief.
-2. Normalize objective, audience, platform, content pillar, and source/claim metadata.
-3. Generate hook variants and select a candidate.
-4. Draft narration and a scene-by-scene storyboard.
-5. Produce on-screen text, shot direction, and voiceover *text* for each scene.
-6. Generate caption, relevant hashtags, CTA, and editorial flags.
-7. Validate structured output and preserve content identity.
-8. Export a package marked `human_review_required=true`.
+All generation/file routes require `Authorization: Bearer $VYRO_SERVICE_API_KEY`.
 
-## Install
+## Image generation
+Set `IMAGE_API_KEY` and `IMAGE_MODEL` to enable optional image generation. The default model is `gpt-image-2.6-flare`. The service accepts only `b64_json` responses, saves files under a hashed demo namespace, and returns an opaque asset ID. Remote image URLs are never fetched. Files expire according to `IMAGE_RETENTION_HOURS` (default 48 hours). Image generation may incur provider charges; leave `IMAGE_API_KEY` blank to keep the feature disabled.
 
+## Install and run
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e '.[dev]'
-cp .env.example .env
+pip install -e '.[api,dev]'
+uvicorn vyro_ai_content_engine.api:app --host 0.0.0.0 --port 8102
+pytest -q
 ```
 
-Add an OpenAI-compatible provider key to `.env`. Do not commit `.env`.
+## Security and review
+- Keep API keys server-side and use HTTPS in production.
+- `demo_id` is a temporary namespace, not authentication. Never treat it as a verified identity.
+- Source claims, paid-partnership disclosure, AI-media disclosure, and asset rights remain human review items.
+- Never invent client results, reviews, product claims, or virality guarantees.
 
-## CLI
+## Image API compatibility
 
-```bash
-vyro-ai validate examples/brief_umkm.json
-vyro-ai generate examples/brief_umkm.json --output output/content-package.json
-```
+The optional image adapter uses the official OpenAI Images API (`/v1/images/generations`) and requests `b64_json` only. The default `IMAGE_MODEL` is `gpt-image-2.6-flare`; select a model available to the connected API organization. Some GPT Image models may require organization verification. See the official Image API reference and image-generation guide before enabling paid generation.
 
-## Python API
-
-```python
-from vyro_ai_content_engine.engine import ContentEngine
-
-engine = ContentEngine.from_env()
-package = engine.generate(brief_dict)
-content_package = package.model_dump(mode="json")
-```
-
-The returned `ContentPackage` can be passed to `vyro-ai-voice-studio` after an editor has checked it and explicitly sets `review_approved=true`, using its `narration` or scene-level `voiceover` values. See `docs/INTEGRATION_CONTRACT.md` in the upgrade bundle.
-
-## Editorial controls
-
-- Brief text is untrusted input and cannot override system instructions.
-- The model must not fabricate news, statistics, source URLs, testimonials, product outcomes, or guaranteed virality.
-- `source_urls` and `claims_to_verify` are preserved. Any new material claims are added to `claims_to_verify`.
-- Paid partnership and AI-generated media reminders are surfaced as review flags.
-- No generated result is considered approved solely because it passed schema validation.
-
-## Quality checks
-
-```bash
-ruff check .
-ruff format --check .
-pytest
-```
-
-## Supported use
-
-Designed for VYRO MEDIA's Indonesian short-form editorial workflow. Provider-neutral in the sense that any endpoint implementing the OpenAI-compatible Chat Completions JSON response contract can be configured.
-
-## 1.2.0 — Prime API
-Optional FastAPI service exposes `POST /v1/content/generate` and `GET /health`. Install `pip install -e '.[api]'`, set `VYRO_SERVICE_API_KEY` plus the existing provider variables, then run `uvicorn vyro_ai_content_engine.api:app --host 0.0.0.0 --port 8000`. The endpoint returns a `ContentPackage` with `human_review_required=true` and `review_approved=false`; generation never approves its own output.
+GPT Image API availability depends on the API organization, model access, account verification requirements, and billing. Keep `IMAGE_API_KEY` empty until the operator has confirmed access and a usage budget; generated images are temporary demo assets, not permanent library files.
