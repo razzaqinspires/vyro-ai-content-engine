@@ -1,3 +1,3 @@
-"""VYRO AI Content Engine public package."""
+"""VYRO MEDIA vyro-ai-content-engine component."""
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"

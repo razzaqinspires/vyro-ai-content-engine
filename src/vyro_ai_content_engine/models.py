@@ -72,8 +72,8 @@ class ContentPackage(BaseModel):
     title: str
     pillar: str
     audience: str
-    platform: str
-    language: str
+    platform: str = "instagram_reels"
+    language: str = "id-ID"
     duration_seconds: int = Field(ge=8, le=90)
     hook_variants: list[str] = Field(min_length=2, max_length=5)
     selected_hook: str

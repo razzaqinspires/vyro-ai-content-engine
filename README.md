@@ -72,3 +72,6 @@ pytest
 ## Supported use
 
 Designed for VYRO MEDIA's Indonesian short-form editorial workflow. Provider-neutral in the sense that any endpoint implementing the OpenAI-compatible Chat Completions JSON response contract can be configured.
+
+## 1.2.0 — Prime API
+Optional FastAPI service exposes `POST /v1/content/generate` and `GET /health`. Install `pip install -e '.[api]'`, set `VYRO_SERVICE_API_KEY` plus the existing provider variables, then run `uvicorn vyro_ai_content_engine.api:app --host 0.0.0.0 --port 8000`. The endpoint returns a `ContentPackage` with `human_review_required=true` and `review_approved=false`; generation never approves its own output.
